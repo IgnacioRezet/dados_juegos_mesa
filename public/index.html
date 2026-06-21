@@ -19,8 +19,11 @@
   <!-- Lobby -->
   <div id="lobby" class="lobby">
     <div class="lobby-card">
-      <h1>⚔ Dados de <span>El Anillo Único</span></h1>
-      <p class="subtitle">Lanzador 3D en tiempo real para tu compañía</p>
+      <h1>🎲 Dados de <span>juegos de mesa</span></h1>
+      <p class="subtitle">Lanzador 3D en tiempo real para tu mesa</p>
+
+      <label>Juego</label>
+      <div id="game-select" class="game-cards"></div>
 
       <label>Tu nombre
         <input id="name-input" type="text" maxlength="24" placeholder="Aragorn" />
@@ -48,7 +51,7 @@
 
     <!-- Cabecera -->
     <header class="topbar">
-      <div class="brand">⚔ El Anillo Único</div>
+      <div class="brand" id="brand">🎲 Dados</div>
       <div class="session-pill">
         Sesión: <strong id="session-code">—</strong>
         <button id="share-btn" title="Copiar enlace">🔗</button>
@@ -76,23 +79,8 @@
 
     <!-- Controles -->
     <footer class="controls">
-      <div class="dice-control">
-        <span class="dice-label">Dados de éxito <em>d6</em></span>
-        <div class="stepper">
-          <button data-step="-1" data-target="d6">−</button>
-          <span id="d6-count" class="count">2</span>
-          <button data-step="1" data-target="d6">+</button>
-        </div>
-      </div>
-
-      <div class="dice-control">
-        <span class="dice-label">Dado de hazaña <em>d12</em></span>
-        <div class="stepper">
-          <button data-step="-1" data-target="d12">−</button>
-          <span id="d12-count" class="count">1</span>
-          <button data-step="1" data-target="d12">+</button>
-        </div>
-      </div>
+      <!-- Los controles de dados se generan segun el juego de la sesion -->
+      <div id="dice-controls" class="dice-controls"></div>
 
       <div class="dice-control">
         <span class="dice-label">Color</span>

@@ -53,13 +53,14 @@ export class Network {
     }
   }
 
-  join(session, name, color) {
-    this._pending = { type: 'join', session, name, color };
+  join(session, name, color, game) {
+    this._pending = { type: 'join', session, name, color, game };
     this.send(this._pending);
   }
 
-  roll(numD6, numD12, color) {
-    this.send({ type: 'roll', numD6, numD12, color });
+  // dice: lista expandida de tipos, p.ej. [{type:'d6'}, {type:'d12'}]
+  roll(game, dice, color) {
+    this.send({ type: 'roll', game, dice, color });
   }
 
   sendResult(rollId, results, summary) {

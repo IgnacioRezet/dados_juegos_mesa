@@ -24,13 +24,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ---------------------------------------------------------------------------
 // Estado en memoria de las sesiones
 // ---------------------------------------------------------------------------
-/** @type {Map<string, { clients: Set<any>, history: any[] }>} */
+/** @type {Map<string, { clients: Set<any>, history: any[], game: string }>} */
 const sessions = new Map();
 
 function getSession(code) {
   let s = sessions.get(code);
   if (!s) {
-    s = { clients: new Set(), history: [] };
+    s = { clients: new Set(), history: [], game: null };
     sessions.set(code, s);
   }
   return s;
@@ -64,13 +64,17 @@ function participantsList(session) {
 // Cada cliente reporta el resultado que calculo con 'rollResult', y el servidor
 // guarda el primero recibido por tirada para el historial / nuevos jugadores.
 
+// El cliente envia ya la lista expandida de dados ([{type}, ...]) segun el
+// juego de la sesion. El servidor es agnostico del juego: solo valida que cada
+// entrada tenga un `type` razonable y limita el total de dados en mesa.
+const MAX_DICE = 24;
+
 function buildDiceSpec(request) {
-  const n6 = Math.max(0, Math.min(20, request.numD6 | 0));
-  const n12 = Math.max(0, Math.min(6, request.numD12 | 0));
-  const dice = [];
-  for (let i = 0; i < n12; i++) dice.push({ type: 'd12' });
-  for (let i = 0; i < n6; i++) dice.push({ type: 'd6' });
-  return dice;
+  if (!Array.isArray(request.dice)) return [];
+  return request.dice
+    .filter((d) => d && typeof d.type === 'string')
+    .slice(0, MAX_DICE)
+    .map((d) => ({ type: d.type.slice(0, 16) }));
 }
 
 function randomSeed() {
@@ -106,11 +110,15 @@ wss.on('connection', (ws) => {
         const session = getSession(code);
         session.clients.add(ws);
 
-        // Confirmar al jugador que entro, con su id y el historial reciente
+        // El juego lo fija quien crea la sesion; los que entran despues lo heredan.
+        if (!session.game) session.game = msg.game || 'tor';
+
+        // Confirmar al jugador que entro, con su id, el juego y el historial
         ws.send(JSON.stringify({
           type: 'joined',
           playerId: ws.playerId,
           session: code,
+          game: session.game,
           history: session.history.slice(-30),
           participants: participantsList(session),
         }));
@@ -140,10 +148,13 @@ wss.on('connection', (ws) => {
         const dice = buildDiceSpec(msg);
         if (dice.length === 0) break;
 
+        const session = getSession(ws.sessionCode);
+
         const roll = {
           type: 'roll',
           rollId: 'r' + Date.now() + '-' + ws.playerId,
           roller: { id: ws.playerId, name: ws.playerName },
+          game: session.game || 'tor',  // el juego es el de la sesion
           color: msg.color || ws.color,
           seed: randomSeed(),
           dice,             // solo tipos; el resultado lo calcula la fisica
@@ -152,7 +163,6 @@ wss.on('connection', (ws) => {
           at: Date.now(),
         };
 
-        const session = getSession(ws.sessionCode);
         session.history.push(roll);
         if (session.history.length > 100) session.history.shift();
 

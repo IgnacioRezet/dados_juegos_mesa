@@ -11,7 +11,8 @@
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { createDie, resultForFace, D6_SIZE, D12_RADIUS } from './dice.js';
+import { D6_SIZE, D12_RADIUS } from './dice.js';
+import { createDie } from './games.js';
 import { VERTICES, FACES } from './dodecahedron.js';
 import { DiceAudio } from './audio.js';
 
@@ -195,17 +196,17 @@ export class DiceScene {
     const starts = this._startPositions(roll.dice.length);
 
     roll.dice.forEach((res, i) => {
-      const die = createDie(res.type, roll.color);
+      const die = createDie(roll.game, res.type, roll.color);
       die.mesh.castShadow = true;
       die.mesh.traverse((o) => (o.castShadow = true));
       this.scene.add(die.mesh);
 
-      const shape = res.type === 'd12'
+      const shape = die.geometryKind === 'dodeca'
         ? convexDodecaShape(D12_RADIUS)
         : new CANNON.Box(new CANNON.Vec3(D6_SIZE / 2, D6_SIZE / 2, D6_SIZE / 2));
 
       const body = new CANNON.Body({
-        mass: res.type === 'd12' ? 1.3 : 1,
+        mass: die.mass,
         material: this.diceMat,
         allowSleep: true,
         sleepSpeedLimit: 0.2,
@@ -229,7 +230,7 @@ export class DiceScene {
       body.velocity.set(-sx * 0.6 + (rng() - 0.5) * 5, -2 - rng() * 3, -sz * 0.6 + (rng() - 0.5) * 5);
       body.angularVelocity.set((rng() - 0.5) * 22, (rng() - 0.5) * 22, (rng() - 0.5) * 22);
 
-      const heavy = res.type === 'd12';
+      const heavy = die.geometryKind === 'dodeca';
       body.addEventListener('collide', (e) => {
         const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
         if (v > 1.2) this.audio.clack(Math.min(1, v / 9), heavy);
@@ -261,7 +262,7 @@ export class DiceScene {
         const y = n.copy(normal).applyQuaternion(d.die.mesh.quaternion).y;
         if (y > bestY) { bestY = y; bestIndex = idx; }
       });
-      return resultForFace(d.die.type, bestIndex);
+      return d.die.resultForFace(bestIndex);
     });
   }
 

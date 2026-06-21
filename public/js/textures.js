@@ -166,6 +166,89 @@ function drawEyeOfSauron(ctx) {
   ctx.restore();
 }
 
+/**
+ * Calavera (HeroQuest): cráneo + mandíbula en tinta, con ojos, nariz y dientes
+ * "vaciados" en el color del dado. Indica daño en el ataque.
+ */
+function drawSkull(ctx, color) {
+  ctx.save();
+  ctx.translate(SIZE / 2, SIZE * 0.46);
+  ctx.fillStyle = '#111';
+
+  // Craneo (boveda redondeada con base recta)
+  ctx.beginPath();
+  ctx.moveTo(-66, 30);
+  ctx.bezierCurveTo(-80, -78, 80, -78, 66, 30);
+  ctx.lineTo(42, 30);
+  ctx.lineTo(42, 48);
+  ctx.lineTo(-42, 48);
+  ctx.lineTo(-42, 30);
+  ctx.closePath();
+  ctx.fill();
+
+  // Mandibula
+  ctx.beginPath();
+  ctx.moveTo(-42, 46);
+  ctx.lineTo(-34, 90);
+  ctx.lineTo(34, 90);
+  ctx.lineTo(42, 46);
+  ctx.closePath();
+  ctx.fill();
+
+  // Huecos en el color del dado: cuencas, nariz y dientes
+  const hollow = shade(color, 0.94);
+  ctx.fillStyle = hollow;
+  ctx.beginPath(); ctx.ellipse(-31, -8, 21, 25, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(31, -8, 21, 25, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, 6); ctx.lineTo(-13, 34); ctx.lineTo(13, 34); ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = hollow;
+  ctx.lineWidth = 6;
+  for (const x of [-21, -7, 7, 21]) {
+    ctx.beginPath(); ctx.moveTo(x, 50); ctx.lineTo(x, 86); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Silueta de escudo (HeroQuest) centrada en el canvas. */
+function shieldPath(ctx) {
+  ctx.beginPath();
+  ctx.moveTo(-60, -68);
+  ctx.lineTo(60, -68);
+  ctx.lineTo(60, -8);
+  ctx.quadraticCurveTo(60, 58, 0, 88);
+  ctx.quadraticCurveTo(-60, 58, -60, -8);
+  ctx.closePath();
+}
+
+/**
+ * Escudo de HeroQuest. `black` = escudo negro (defensa de monstruos), relleno
+ * en tinta; si no, escudo blanco (defensa de heroes), relleno claro con borde.
+ */
+function drawShield(ctx, black) {
+  ctx.save();
+  ctx.translate(SIZE / 2, SIZE / 2);
+  ctx.lineJoin = 'round';
+  shieldPath(ctx);
+  if (black) {
+    ctx.fillStyle = '#111';
+    ctx.fill();
+  } else {
+    ctx.fillStyle = '#f4f1e4';
+    ctx.fill();
+    ctx.lineWidth = 11;
+    ctx.strokeStyle = '#111';
+    ctx.stroke();
+    // Refuerzo en cruz para distinguirlo a simple vista
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(0, -60); ctx.lineTo(0, 78); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-52, -16); ctx.lineTo(52, -16); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function makeTexture(canvas) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.anisotropy = 8;
@@ -208,4 +291,22 @@ export function createD12Textures(color) {
     textures.push(makeTexture(canvas));
   }
   return textures;
+}
+
+/**
+ * Simbolo grabado en cada cara del dado de combate de HeroQuest, en el orden
+ * de caras del BoxGeometry [ +X, -X, +Y, -Y, +Z, -Z ]:
+ *   3 calaveras (daño), 2 escudos blancos (heroes), 1 escudo negro (monstruos).
+ * Es la fuente de verdad del mapeo cara<->simbolo, compartida con games.js.
+ */
+export const HEROQUEST_FACE_SYMBOLS = ['skull', 'skull', 'skull', 'white', 'white', 'black'];
+
+/** Devuelve las 6 texturas del dado de combate de HeroQuest. */
+export function createHeroQuestCombatTextures(color) {
+  return HEROQUEST_FACE_SYMBOLS.map((sym) => {
+    const { canvas, ctx } = baseCanvas(color);
+    if (sym === 'skull') drawSkull(ctx, color);
+    else drawShield(ctx, sym === 'black');
+    return makeTexture(canvas);
+  });
 }
