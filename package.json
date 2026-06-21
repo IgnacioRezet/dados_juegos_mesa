@@ -1,0 +1,25 @@
+{
+  "name": "dados-anillo-unico",
+  "version": "1.0.0",
+  "description": "Lanzador de dados online 3D para El Anillo Unico (The One Ring) con sesiones en tiempo real",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "dados",
+    "dice",
+    "the-one-ring",
+    "el-anillo-unico",
+    "threejs",
+    "websocket"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  }
+}

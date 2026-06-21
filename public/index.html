@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dados de El Anillo Único</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Lobby -->
+  <div id="lobby" class="lobby">
+    <div class="lobby-card">
+      <h1>⚔ Dados de <span>El Anillo Único</span></h1>
+      <p class="subtitle">Lanzador 3D en tiempo real para tu compañía</p>
+
+      <label>Tu nombre
+        <input id="name-input" type="text" maxlength="24" placeholder="Aragorn" />
+      </label>
+
+      <label>Código de sesión
+        <div class="row">
+          <input id="session-input" type="text" maxlength="12" placeholder="MESA" />
+          <button id="random-session" type="button" title="Generar código">🎲</button>
+        </div>
+      </label>
+
+      <label>Color de tus dados
+        <input id="color-input" type="color" value="#7cc23a" />
+      </label>
+
+      <button id="join-btn" class="primary">Entrar a la mesa</button>
+      <p class="hint-text">Comparte el código con tu grupo para tirar juntos.</p>
+    </div>
+  </div>
+
+  <!-- App principal -->
+  <div id="app" class="app hidden">
+    <canvas id="scene"></canvas>
+
+    <!-- Cabecera -->
+    <header class="topbar">
+      <div class="brand">⚔ El Anillo Único</div>
+      <div class="session-pill">
+        Sesión: <strong id="session-code">—</strong>
+        <button id="share-btn" title="Copiar enlace">🔗</button>
+      </div>
+      <div class="conn">
+        <span id="conn-status" class="dot"></span>
+        <span><span id="player-count">0</span> 👥</span>
+      </div>
+    </header>
+
+    <!-- Banner de resultado -->
+    <div id="result-banner" class="result-banner"></div>
+
+    <!-- Panel de participantes -->
+    <aside class="panel participants-panel">
+      <h2>Compañía</h2>
+      <ul id="participants" class="participants"></ul>
+    </aside>
+
+    <!-- Registro de tiradas -->
+    <aside class="panel log-panel">
+      <h2>Tiradas</h2>
+      <ul id="roll-log" class="roll-log"></ul>
+    </aside>
+
+    <!-- Controles -->
+    <footer class="controls">
+      <div class="dice-control">
+        <span class="dice-label">Dados de éxito <em>d6</em></span>
+        <div class="stepper">
+          <button data-step="-1" data-target="d6">−</button>
+          <span id="d6-count" class="count">2</span>
+          <button data-step="1" data-target="d6">+</button>
+        </div>
+      </div>
+
+      <div class="dice-control">
+        <span class="dice-label">Dado de hazaña <em>d12</em></span>
+        <div class="stepper">
+          <button data-step="-1" data-target="d12">−</button>
+          <span id="d12-count" class="count">1</span>
+          <button data-step="1" data-target="d12">+</button>
+        </div>
+      </div>
+
+      <div class="dice-control">
+        <span class="dice-label">Color</span>
+        <input id="table-color" type="color" value="#7cc23a" />
+      </div>
+
+      <button id="roll-btn" class="primary roll">🎲 ¡Tirar!</button>
+    </footer>
+
+    <div id="hint" class="floating-hint"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
