@@ -40,9 +40,9 @@ export const CHARACTER_FIELDS = [
 
 // --- Atributos (Fuerza / Corazón / Ingenio): valor + número objetivo ------
 export const ATTRIBUTES = [
-  { key: 'strength', label: 'Fuerza' },
+  { key: 'strength', label: 'Cuerpo' },
   { key: 'heart', label: 'Corazón' },
-  { key: 'wits', label: 'Ingenio' },
+  { key: 'wits', label: 'Mente' },
 ];
 
 // --- Aguante / Esperanza: cajas numericas ---------------------------------
@@ -70,10 +70,10 @@ export const CONDITIONS = [
 // --- Habilidades: 3 columnas de 6, cada una con valor 1..6 + favorita -----
 export const SKILL_COLUMNS = [
   [
-    { key: 'awe', label: 'Imponer' },
+    { key: 'awe', label: 'Impresionar' },
     { key: 'athletics', label: 'Atletismo' },
-    { key: 'awareness', label: 'Percepción' },
-    { key: 'hunting', label: 'Caza' },
+    { key: 'awareness', label: 'Alerta' },
+    { key: 'explore', label: 'Explorar' },    
     { key: 'song', label: 'Canto' },
     { key: 'craft', label: 'Artesanía' },
   ],
@@ -83,13 +83,13 @@ export const SKILL_COLUMNS = [
     { key: 'insight', label: 'Perspicacia' },
     { key: 'healing', label: 'Sanar' },
     { key: 'courtesy', label: 'Cortesía' },
-    { key: 'battle', label: 'Batalla' },
+    { key: 'battle', label: 'Guerrear' },
   ],
   [
     { key: 'persuade', label: 'Persuadir' },
     { key: 'stealth', label: 'Sigilo' },
     { key: 'scan', label: 'Escudriñar' },
-    { key: 'explore', label: 'Explorar' },
+    { key: 'hunting', label: 'Caza' },
     { key: 'riddle', label: 'Acertijos' },
     { key: 'lore', label: 'Saber' },
   ],
