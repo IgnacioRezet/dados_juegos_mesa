@@ -225,6 +225,20 @@ button:active { transform: scale(0.96); }
   font-size: 0.95rem;
 }
 
+/* Control de musica ambiente */
+.music-ctrl { display: flex; align-items: center; gap: 6px; }
+#music-toggle {
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 5px 9px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  line-height: 1;
+}
+#music-toggle.off { opacity: 0.55; }
+#music-vol { width: 80px; accent-color: var(--accent); cursor: pointer; }
+
 .conn { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
 .dot {
   width: 10px; height: 10px;
@@ -414,9 +428,24 @@ button:active { transform: scale(0.96); }
 }
 
 /* Responsive */
-@media (max-width: 720px) {
-  .participants-panel { width: 140px; top: 60px; }
-  .log-panel { width: 180px; max-height: 38vh; }
-  .controls { gap: 10px; padding: 12px 10px 18px; }
-  .result-banner { font-size: 0.85rem; top: 110px; white-space: normal; max-width: 90vw; text-align: center; }
+@media (max-width: 768px) {
+  /* Cabecera mas compacta */
+  .topbar { padding: 8px 10px; gap: 6px; }
+  .brand { font-size: 0.9rem; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-pill { font-size: 0.78rem; padding: 5px 9px; }
+  .conn { font-size: 0.82rem; }
+  #music-vol { display: none; }   /* en movil solo el boton de música */
+
+  /* Paneles plegables en las esquinas, bajo la cabecera. En movil arrancan
+     plegados (clase .collapsed via JS) para no tapar las hojas; al tocar su
+     titulo se expanden. */
+  .participants-panel { top: 46px; left: 8px; width: auto; max-width: 44vw; }
+  .log-panel { top: 46px; right: 8px; left: auto; width: auto; max-width: 44vw; max-height: 50vh; }
+  .participants-panel:not(.collapsed) { width: 150px; }
+  .log-panel:not(.collapsed) { width: 56vw; }
+
+  .controls { gap: 10px; padding: 10px 8px 16px; }
+  .dice-controls { gap: 10px; }
+  .primary.roll { padding: 12px 20px; font-size: 1rem; }
+  .result-banner { font-size: 0.85rem; top: 92px; white-space: normal; max-width: 90vw; text-align: center; }
 }

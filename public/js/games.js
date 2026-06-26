@@ -49,6 +49,11 @@ const torGame = {
   name: 'El Anillo Único',
   icon: '⚔',
   tagline: 'd6 de éxito · d12 de hazaña',
+  // Musica ambiente de la sesion (rutas relativas a /public). Suena en bucle.
+  music: [
+    'assets/music/LOTR - Rohan  Rohirrim Soundtrack Suite.mp3',
+    'assets/music/Nazgul Theme x Sauron Theme  EPIC VERSION (The Lord of the Rings Soundtrack).mp3',
+  ],
   dice: [
     {
       type: 'd6', label: 'Dados de éxito', sub: 'd6', min: 0, max: 20, default: 2,
@@ -94,6 +99,9 @@ const heroQuestGame = {
   name: 'HeroQuest',
   icon: '💀',
   tagline: 'd6 de combate · calaveras y escudos',
+  // Pon aqui los mp3 de HeroQuest (en public/assets/music/) y sonaran solo en
+  // sus sesiones. De momento vacio: HeroQuest no lleva musica.
+  music: [],
   dice: [
     {
       type: 'combat', label: 'Dados de combate', sub: 'd6', min: 0, max: 12, default: 3,

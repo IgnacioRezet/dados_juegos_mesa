@@ -352,3 +352,45 @@
   font-size: 0.82rem;
 }
 .sheets-layer.hidden { display: none !important; }
+
+/* ------------------------------------------------------------------ Movil */
+@media (max-width: 768px) {
+  /* Las hojas se apilan a ancho completo, sin los margenes que despejaban los
+     paneles de escritorio (en movil esos paneles van plegados por defecto). */
+  .sheets-layer {
+    inset: 50px 0 86px;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 8px;
+  }
+  .sheets-mine,
+  .sheets-others { width: 100%; margin: 0; }
+  .sheets-others { gap: 10px; }
+
+  .sheet,
+  .sheet.compact { width: 100%; max-width: 100%; font-size: 0.82rem; max-height: none; }
+  .sheet.compact:hover { width: 100%; }   /* sin expandir al tocar */
+
+  /* Todo a una sola columna */
+  .sheet-body { grid-template-columns: 1fr; gap: 10px; }
+  .sheet-body > .sf-section { grid-column: 1 / -1; }
+  .sf-skill-cols { grid-template-columns: 1fr 1fr; }   /* habilidades en 2 col */
+  .sf-side { grid-template-columns: 1fr; }
+  .sf-rv-lists { grid-template-columns: 1fr; }
+
+  .sf-label { flex: 0 0 96px; font-size: 0.7rem; }
+  .sf-attr-grid { gap: 6px; }
+  .sheet .sf-box { width: 38px; height: 34px; }
+  .sf-cond-grid { gap: 10px; flex-wrap: wrap; }
+  .sf-rewards { gap: 8px; }
+  .sf-foot { flex-wrap: wrap; }
+
+  /* El boton "Hojas" centrado bajo la cabecera, entre los pills de paneles */
+  .sheets-toggle { top: 46px; left: 50%; transform: translateX(-50%); z-index: 12; }
+}
+
+/* Pantallas muy estrechas: habilidades en una sola columna */
+@media (max-width: 460px) {
+  .sf-skill-cols { grid-template-columns: 1fr; }
+  .sheet { font-size: 0.8rem; }
+}

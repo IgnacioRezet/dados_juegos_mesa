@@ -12,6 +12,7 @@ import { Network } from './network.js';
 import { listGames, getGame, DEFAULT_GAME } from './games.js';
 import { SheetView } from './sheet.js';
 import { CULTURES, DEFAULT_CULTURE } from './sheet-schema.js';
+import { MusicPlayer } from './music.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -45,6 +46,7 @@ let currentGame = getGame(state.game);   // juego activo (autoritativo tras 'joi
 
 const scene = new DiceScene($('#scene'));
 const net = new Network();
+const music = new MusicPlayer();
 
 // ---------------------------------------------------------------------------
 // Lobby (entrar a una sesion)
@@ -127,6 +129,12 @@ function joinSession() {
   localStorage.setItem('tor.name', name);
   localStorage.setItem('tor.color', state.color);
 
+  // Arranca la música del juego elegido AQUÍ (dentro del gesto de clic, para
+  // que el navegador permita el audio). Si la sesión resulta ser de otro juego,
+  // applyGame() cambiará la lista después.
+  music.setPlaylist(getGame(state.game).music);
+  music.start();
+
   net.join(session, name, state.color, state.game, state.culture, clientId);
   lobby.classList.add('hidden');
   $('#app').classList.remove('hidden');
@@ -145,6 +153,9 @@ function applyGame(game) {
   currentGame = game;
   $('#brand').textContent = `${game.icon} ${game.name}`;
   buildDiceControls(game);
+  // Música propia del juego de la sesión (si ya estaba sonando, sigue; si la
+  // lista es distinta, cambia de banda sonora).
+  music.setPlaylist(game.music || []);
 }
 
 function buildDiceControls(game) {
@@ -349,6 +360,14 @@ function wirePanelCollapse(panelSel, appClass) {
 wirePanelCollapse('.participants-panel', 'panels-left-collapsed');
 wirePanelCollapse('.log-panel', 'panels-right-collapsed');
 
+// En móvil, los paneles arrancan plegados para no tapar las hojas (se pueden
+// abrir tocando su título).
+if (window.matchMedia('(max-width: 768px)').matches) {
+  $('.participants-panel')?.classList.add('collapsed');
+  $('.log-panel')?.classList.add('collapsed');
+  $('#app').classList.add('panels-left-collapsed', 'panels-right-collapsed');
+}
+
 net.on('sheetCreated', (msg) => {
   if (msg.sheet) addSheet(msg.sheet);
 });
@@ -433,6 +452,25 @@ $('#share-btn').addEventListener('click', async () => {
     flashHint(url);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Controles de música ambiente
+// ---------------------------------------------------------------------------
+const musicToggle = $('#music-toggle');
+const musicVol = $('#music-vol');
+musicVol.value = music.volume;
+
+function renderMusicToggle() {
+  musicToggle.textContent = music.enabled ? '🔊' : '🔇';
+  musicToggle.classList.toggle('off', !music.enabled);
+}
+renderMusicToggle();
+
+musicToggle.addEventListener('click', () => {
+  music.toggle();           // also cuenta como gesto de usuario (desbloquea audio)
+  renderMusicToggle();
+});
+musicVol.addEventListener('input', () => music.setVolume(parseFloat(musicVol.value)));
 
 // Arrancar conexion
 net.connect();
