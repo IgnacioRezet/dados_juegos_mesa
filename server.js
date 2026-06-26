@@ -9,9 +9,28 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const http = require('http');
 const express = require('express');
 const { WebSocketServer } = require('ws');
+
+// Carga minima de .env (sin dependencias) ANTES de requerir strapi, que lee
+// process.env al importarse. Solo define claves que no existan ya en el entorno.
+(function loadDotEnv() {
+  try {
+    const file = path.join(__dirname, '.env');
+    if (!fs.existsSync(file)) return;
+    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+      if (!m) continue;
+      const key = m[1];
+      let val = m[2].replace(/^["']|["']$/g, '');
+      if (process.env[key] === undefined) process.env[key] = val;
+    }
+  } catch (_) { /* sin .env, modo solo memoria */ }
+})();
+
+const { persistenceEnabled, loadSheet, saveSheet } = require('./strapi');
 
 const app = express();
 const server = http.createServer(app);
@@ -24,16 +43,46 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ---------------------------------------------------------------------------
 // Estado en memoria de las sesiones
 // ---------------------------------------------------------------------------
-/** @type {Map<string, { clients: Set<any>, history: any[], game: string }>} */
+/**
+ * @type {Map<string, {
+ *   clients: Set<any>, history: any[], game: string,
+ *   sheets: Map<string, object>,   // playerId -> hoja { playerId, culture, playerName, data }
+ *   editing: Map<string, string>,  // field -> playerId que lo esta editando (efimero)
+ * }>}
+ */
 const sessions = new Map();
 
 function getSession(code) {
   let s = sessions.get(code);
   if (!s) {
-    s = { clients: new Set(), history: [], game: null };
+    s = {
+      clients: new Set(),
+      history: [],
+      game: null,
+      sheets: new Map(),
+      editing: new Map(),
+    };
     sessions.set(code, s);
   }
   return s;
+}
+
+// ---------------------------------------------------------------------------
+// Hojas de personaje (solo El Anillo Unico). El estado vivo esta en memoria y
+// se comparte por WebSocket; la persistencia en Strapi es EXPLICITA: el jugador
+// pulsa "Guardar personaje" (mensaje sheetSave). No hay auto-guardado al entrar
+// ni al editar. El navegador nunca habla con Strapi directamente.
+// ---------------------------------------------------------------------------
+function blankSheet(playerId, culture, playerName) {
+  return { playerId, culture: culture || 'men', playerName: playerName || 'Aventurero', data: {} };
+}
+
+function sheetsList(session) {
+  return [...session.sheets.values()];
+}
+
+function editingObject(session) {
+  return Object.fromEntries(session.editing);
 }
 
 function broadcast(sessionCode, payload, exclude = null) {
@@ -52,6 +101,7 @@ function participantsList(session) {
     id: c.playerId,
     name: c.playerName,
     color: c.color,
+    culture: c.culture || 'men',
   }));
 }
 
@@ -92,7 +142,7 @@ wss.on('connection', (ws) => {
   ws.color = '#7cc23a';
   ws.sessionCode = null;
 
-  ws.on('message', (raw) => {
+  ws.on('message', async (raw) => {
     let msg;
     try {
       msg = JSON.parse(raw.toString());
@@ -103,8 +153,15 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
       case 'join': {
         const code = (msg.session || 'mesa-central').trim().toUpperCase();
+        // Identidad estable del cliente (persistida en su localStorage): permite
+        // recuperar la misma hoja tras recargar o reconectar. Sin ella, cada
+        // conexion seria un jugador nuevo con una hoja en blanco.
+        if (typeof msg.clientId === 'string' && msg.clientId) {
+          ws.playerId = 'c-' + msg.clientId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+        }
         ws.playerName = (msg.name || 'Aventurero').slice(0, 24);
         ws.color = msg.color || ws.color;
+        ws.culture = msg.culture || ws.culture || 'men';
         ws.sessionCode = code;
 
         const session = getSession(code);
@@ -112,6 +169,23 @@ wss.on('connection', (ws) => {
 
         // El juego lo fija quien crea la sesion; los que entran despues lo heredan.
         if (!session.game) session.game = msg.game || 'tor';
+
+        // Hoja de personaje (solo El Anillo Unico). Si no esta en memoria, se
+        // intenta cargar de Strapi; si tampoco existe alli, se crea en blanco.
+        let isNewSheet = false;
+        if (session.game === 'tor' && !session.sheets.has(ws.playerId)) {
+          let sheet = await loadSheet(code, ws.playerId);
+          if (!sheet) {
+            sheet = blankSheet(ws.playerId, ws.culture, ws.playerName);
+            isNewSheet = true;
+          } else {
+            // Actualiza metadatos de presentacion con los del lobby actual.
+            sheet.culture = sheet.culture || ws.culture;
+            sheet.playerName = ws.playerName;
+          }
+          session.sheets.set(ws.playerId, sheet);
+          // No se persiste al entrar: la hoja solo se guarda con "Guardar".
+        }
 
         // Confirmar al jugador que entro, con su id, el juego y el historial
         ws.send(JSON.stringify({
@@ -121,6 +195,8 @@ wss.on('connection', (ws) => {
           game: session.game,
           history: session.history.slice(-30),
           participants: participantsList(session),
+          sheets: sheetsList(session),
+          editing: editingObject(session),
         }));
 
         // Avisar a todos de la nueva lista de participantes
@@ -129,6 +205,14 @@ wss.on('connection', (ws) => {
           participants: participantsList(session),
           joined: { id: ws.playerId, name: ws.playerName },
         });
+
+        // Si se creo una hoja nueva, avisar a los demas para que la muestren.
+        if (isNewSheet) {
+          broadcast(code, {
+            type: 'sheetCreated',
+            sheet: session.sheets.get(ws.playerId),
+          }, ws);
+        }
         break;
       }
 
@@ -136,10 +220,72 @@ wss.on('connection', (ws) => {
         if (!ws.sessionCode) break;
         if (msg.name) ws.playerName = String(msg.name).slice(0, 24);
         if (msg.color) ws.color = msg.color;
+        const session = getSession(ws.sessionCode);
+        // Reflejar el nombre en la hoja (metadato de presentacion; se guarda
+        // cuando el jugador pulse "Guardar personaje").
+        const sheet = session.sheets.get(ws.playerId);
+        if (sheet && msg.name) sheet.playerName = ws.playerName;
         broadcast(ws.sessionCode, {
           type: 'participants',
-          participants: participantsList(getSession(ws.sessionCode)),
+          participants: participantsList(session),
         });
+        break;
+      }
+
+      case 'sheetEdit': {
+        // Edicion de un campo de la PROPIA hoja. Se valida que el jugador solo
+        // edite la suya, se aplica al estado en memoria y se retransmite. NO se
+        // persiste aqui: la escritura en Strapi ocurre con sheetSave.
+        if (!ws.sessionCode || typeof msg.field !== 'string') break;
+        const session = getSession(ws.sessionCode);
+        const sheet = session.sheets.get(ws.playerId);
+        if (!sheet) break;
+        sheet.data[msg.field] = msg.value;
+        broadcast(ws.sessionCode, {
+          type: 'sheetUpdate',
+          playerId: ws.playerId,
+          field: msg.field,
+          value: msg.value,
+        }, ws);
+        break;
+      }
+
+      case 'sheetSave': {
+        // Guardado EXPLICITO de la propia hoja en Strapi (boton "Guardar").
+        if (!ws.sessionCode) break;
+        const session = getSession(ws.sessionCode);
+        const sheet = session.sheets.get(ws.playerId);
+        if (!sheet) break;
+        if (!persistenceEnabled) {
+          ws.send(JSON.stringify({ type: 'sheetSaved', ok: false, reason: 'no-persistence' }));
+          break;
+        }
+        const saved = await saveSheet(ws.sessionCode, ws.playerId, sheet);
+        ws.send(JSON.stringify({
+          type: 'sheetSaved',
+          ok: !!saved,
+          at: Date.now(),
+          reason: saved ? null : 'strapi-error',
+        }));
+        break;
+      }
+
+      case 'sheetFocus':
+      case 'sheetBlur': {
+        // Presencia "estoy editando este campo". field se identifica como
+        // "<playerId>:<fieldName>" para no colisionar entre hojas distintas.
+        if (!ws.sessionCode || typeof msg.field !== 'string') break;
+        const session = getSession(ws.sessionCode);
+        if (msg.type === 'sheetFocus') {
+          session.editing.set(msg.field, ws.playerId);
+        } else if (session.editing.get(msg.field) === ws.playerId) {
+          session.editing.delete(msg.field);
+        }
+        broadcast(ws.sessionCode, {
+          type: 'sheetPresence',
+          field: msg.field,
+          playerId: msg.type === 'sheetFocus' ? ws.playerId : null,
+        }, ws);
         break;
       }
 
@@ -190,11 +336,23 @@ wss.on('connection', (ws) => {
     if (!ws.sessionCode) return;
     const session = sessions.get(ws.sessionCode);
     if (!session) return;
+    const code = ws.sessionCode;
     session.clients.delete(ws);
+
+    // Liberar los campos que este jugador tenia en edicion y avisar a los demas.
+    for (const [field, pid] of [...session.editing]) {
+      if (pid === ws.playerId) {
+        session.editing.delete(field);
+        broadcast(code, { type: 'sheetPresence', field, playerId: null });
+      }
+    }
+
     if (session.clients.size === 0) {
-      sessions.delete(ws.sessionCode);
+      // Sin auto-guardado: la sesion se descarta de memoria. Lo guardado en
+      // Strapi (via "Guardar personaje") se recupera al volver a entrar.
+      sessions.delete(code);
     } else {
-      broadcast(ws.sessionCode, {
+      broadcast(code, {
         type: 'participants',
         participants: participantsList(session),
         left: { id: ws.playerId, name: ws.playerName },
@@ -205,5 +363,6 @@ wss.on('connection', (ws) => {
 
 server.listen(PORT, () => {
   console.log(`\n  ⚔  Dados de El Anillo Unico`);
-  console.log(`  ➜  http://localhost:${PORT}\n`);
+  console.log(`  ➜  http://localhost:${PORT}`);
+  console.log(`  📜  Hojas: ${persistenceEnabled ? 'persistidas en Strapi' : 'solo memoria (sin STRAPI_URL/TOKEN)'}\n`);
 });

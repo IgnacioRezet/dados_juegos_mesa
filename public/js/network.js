@@ -53,8 +53,8 @@ export class Network {
     }
   }
 
-  join(session, name, color, game) {
-    this._pending = { type: 'join', session, name, color, game };
+  join(session, name, color, game, culture, clientId) {
+    this._pending = { type: 'join', session, name, color, game, culture, clientId };
     this.send(this._pending);
   }
 
@@ -69,5 +69,25 @@ export class Network {
 
   updateProfile(name, color) {
     this.send({ type: 'updateProfile', name, color });
+  }
+
+  // ---- Hojas de personaje (El Anillo Unico) ----
+  // Edicion de un campo de la propia hoja.
+  sheetEdit(field, value) {
+    this.send({ type: 'sheetEdit', field, value });
+  }
+
+  // Presencia: empieza/termina de editar un campo (campo = "<playerId>:<name>").
+  sheetFocus(field) {
+    this.send({ type: 'sheetFocus', field });
+  }
+
+  sheetBlur(field) {
+    this.send({ type: 'sheetBlur', field });
+  }
+
+  // Guardado explicito de la propia hoja en Strapi (boton "Guardar personaje").
+  sheetSave() {
+    this.send({ type: 'sheetSave' });
   }
 }

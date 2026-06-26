@@ -9,6 +9,8 @@ npm-debug.log*
 # Variables de entorno / secretos
 .env
 .env.*
+# La plantilla SI se versiona (no contiene secretos)
+!.env.example
 
 # Archivos del sistema operativo
 .DS_Store

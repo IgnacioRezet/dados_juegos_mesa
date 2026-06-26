@@ -1,0 +1,354 @@
+/**
+ * Hojas de personaje de El Anillo Unico: estetica pergamino + tinta roja,
+ * fiel al PDF oficial. Reutiliza las variables de style.css donde aplica.
+ */
+
+:root {
+  --ink: #9a2f23;          /* tinta roja del PDF */
+  --ink-soft: #b9594a;
+  --parchment: #f4ecdc;
+  --parchment-2: #ece0c8;
+  --sheet-line: rgba(154, 47, 35, 0.45);
+}
+
+/* Contenedor de todas las hojas en la mesa.
+   El padding lateral despeja los paneles Compañía (izq) y Tiradas (der) para
+   que no tapen las hojas. Al plegar los paneles se reduce (clase en #app). */
+.sheets-layer {
+  position: absolute;
+  inset: 56px 0 96px;
+  display: flex;
+  gap: 14px;
+  padding: 8px 286px 8px 208px;
+  overflow: auto;
+  z-index: 7;
+  pointer-events: none;          /* deja pasar clics al canvas salvo en las hojas */
+}
+.app.panels-left-collapsed .sheets-layer { padding-left: 64px; }
+.app.panels-right-collapsed .sheets-layer { padding-right: 64px; }
+.sheets-layer .sheet { pointer-events: auto; }
+
+/* Mi hoja: grande. Las de los demas: compactas, expandibles al pasar el raton. */
+.sheets-mine { flex: 0 0 auto; }
+.sheets-others {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* ------------------------------------------------------------------ Hoja */
+.sheet {
+  /* Evita que el navegador en modo oscuro pinte los inputs con fondo gris y
+     texto claro: forzamos esquema claro para controlar nosotros los colores. */
+  color-scheme: light;
+  width: 640px;
+  max-width: 92vw;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(154,47,35,0.04) 24px),
+    linear-gradient(160deg, var(--parchment), var(--parchment-2));
+  border: 2px solid var(--sheet-accent, var(--ink));
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color: #3a2a20;
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  padding: 12px 16px 16px;
+  max-height: 100%;
+  overflow: auto;
+}
+.sheet.compact {
+  width: 280px;
+  font-size: 0.74rem;
+  opacity: 0.92;
+  transition: width 0.18s ease, opacity 0.18s;
+}
+.sheet.compact:hover { width: 560px; opacity: 1; }
+
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--sheet-accent, var(--ink));
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+.sheet-owner {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+.sheet-head-right { display: flex; align-items: center; gap: 10px; }
+.sheet-culture {
+  font-size: 0.8rem;
+  color: var(--sheet-accent, var(--ink-soft));
+  font-weight: 700;
+}
+.sheet-min {
+  width: 26px; height: 22px;
+  border: 1px solid var(--sheet-accent, var(--ink));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+}
+.sheet-min:hover { background: rgba(154, 47, 35, 0.12); }
+
+/* Hoja plegada: solo se ve la cabecera */
+.sheet.minimized { width: auto; min-width: 240px; max-height: none; }
+.sheet.minimized .sheet-body { display: none; }
+.sheet.minimized .sheet-head { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.sheet.compact.minimized:hover { width: auto; }   /* no expandir al pasar el raton si esta plegada */
+
+.sheet-body {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 10px 14px;
+}
+
+.sf-section { min-width: 0; }
+.sf-character { grid-column: 1; }
+.sf-attributes { grid-column: 2; }
+.sf-skills { grid-column: 1 / -1; }
+.sf-side { grid-column: 1 / -1; }
+.sf-combat { grid-column: 1 / -1; }
+
+.sf-title {
+  margin: 4px 0 6px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--ink);
+  border-bottom: 1px solid var(--sheet-line);
+  padding-bottom: 2px;
+}
+.sf-subtitle {
+  margin: 6px 0 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-soft);
+}
+
+/* Filas etiqueta + campo */
+.sf-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.sf-label {
+  flex: 0 0 130px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.sf-row-area { align-items: flex-start; }
+
+/* Inputs: lineas tipo formulario sobre fondo claro (texto oscuro legible).
+   Se prefijan con `.sheet` para ganar en especificidad a la regla global
+   `input[type="text"]` de style.css (que es del lobby, con fondo oscuro). */
+.sheet .sf-text, .sheet .sf-area {
+  flex: 1;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--sheet-line);
+  background: rgba(255, 255, 255, 0.5);
+  color: #241812;
+  caret-color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 3px 6px;
+  border-radius: 4px 4px 0 0;
+}
+.sheet .sf-text::placeholder, .sheet .sf-area::placeholder { color: #9a8c7c; }
+.sheet .sf-text:focus, .sheet .sf-area:focus, .sheet .sf-box:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: #fffdf6;
+  box-shadow: 0 0 0 2px rgba(154, 47, 35, 0.18);
+}
+/* Hojas de otros (solo lectura): texto algo mas tenue pero legible */
+.sheet .sf-text:disabled, .sheet .sf-area:disabled, .sheet .sf-box:disabled {
+  color: #4a382c;
+  -webkit-text-fill-color: #4a382c;   /* Safari/Chrome respetan el color en disabled */
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.32);
+}
+.sf-area { min-height: 70px; resize: vertical; border: 1px solid var(--sheet-line); border-radius: 6px; }
+
+/* Caja numerica (rombo redondeado) */
+.sheet .sf-box {
+  width: 42px;
+  height: 38px;
+  text-align: center;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink);
+  caret-color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transform: rotate(0deg);
+}
+
+/* Atributos */
+.sf-attr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sf-attr { text-align: center; }
+.sf-attr-name { display: block; font-size: 0.72rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.sf-attr-row { display: flex; justify-content: center; gap: 6px; }
+.sf-attr-box { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sf-mini { font-size: 0.6rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Skills */
+.sf-skill-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; }
+.sf-skill { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.sf-skill-name { flex: 1; font-size: 0.74rem; }
+.sf-prof { margin-top: 8px; max-width: 260px; }
+
+/* Checkbox cuadrado */
+.sf-check {
+  width: 15px; height: 15px;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.sf-check.on { background: var(--ink); box-shadow: inset 0 0 0 2px var(--parchment); }
+.sf-check:disabled { cursor: default; opacity: 0.85; }
+
+/* Rombos de rating */
+.sf-rating { display: flex; gap: 4px; }
+.sf-pip {
+  width: 13px; height: 13px;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  transform: rotate(45deg);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 2px;
+}
+.sf-pip.on { background: var(--ink); }
+.sf-pip:disabled { cursor: default; }
+
+/* Endurance / Hope / Puntos: cajas con etiqueta */
+.sf-stat-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.sf-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sf-stat-label { font-size: 0.58rem; color: var(--ink-soft); text-transform: uppercase; text-align: center; }
+.sf-stat-row { margin-bottom: 8px; }
+
+.sf-side { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; align-items: start; }
+.sf-side > .sf-title { grid-column: 1 / -1; }
+.sf-conditions { grid-column: 1 / -1; }
+.sf-cond-grid { display: flex; gap: 16px; margin-bottom: 6px; }
+.sf-cond { display: flex; align-items: center; gap: 5px; }
+.sf-cond-label { font-size: 0.72rem; }
+.sf-rewards { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+.sf-rv-lists { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px; }
+
+/* Combat */
+.sf-wargear { margin-bottom: 8px; }
+.sf-wg-row { display: flex; gap: 6px; margin-bottom: 3px; align-items: center; }
+.sf-wg-head .sf-wg-cell { font-size: 0.62rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Listas repetibles (Equipo de Guerra, Armadura): +/× para añadir/quitar filas */
+.sf-repeat { margin-bottom: 4px; }
+.sf-wg-actions { flex: 0 0 22px; display: flex; justify-content: center; }
+.sf-row-del {
+  width: 20px; height: 20px;
+  border: 1px solid var(--ink-soft);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+}
+.sf-row-del:hover { background: rgba(192, 57, 43, 0.15); border-color: #c0392b; color: #c0392b; }
+.sf-row-add {
+  margin-top: 4px;
+  padding: 4px 12px;
+  border: 1px dashed var(--sheet-accent, var(--ink));
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.sf-row-add:hover { background: rgba(154, 47, 35, 0.08); }
+.sf-repeat-rows:empty::after {
+  content: '— sin filas —';
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.sf-armour { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.sf-armour-cell { display: flex; flex-direction: column; gap: 2px; }
+.sf-totals { display: flex; gap: 18px; }
+.sf-total-block { display: flex; align-items: flex-end; gap: 6px; }
+
+/* Pie: guardar personaje */
+.sf-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sheet-line);
+}
+.sf-save-btn {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: var(--sheet-accent, var(--ink));
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.sf-save-btn:hover { filter: brightness(1.08); }
+.sf-save-btn:disabled { opacity: 0.6; cursor: default; }
+.sf-save-status { font-size: 0.78rem; color: var(--ink-soft); }
+.sf-save-status.ok { color: #2e7d32; font-weight: 700; }
+.sf-save-status.err { color: #c0392b; font-weight: 700; }
+
+/* Indicador de "editando ahora" (presencia) */
+.editing-by {
+  box-shadow: 0 0 0 2px var(--editor-color, var(--ink));
+  border-radius: 4px;
+  animation: editPulse 1.2s ease-in-out infinite;
+}
+@keyframes editPulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--editor-color, var(--ink)); }
+  50% { box-shadow: 0 0 0 3px var(--editor-color, var(--ink)); }
+}
+
+/* Acentos por cultura (marco). El borde toma --sheet-accent ya fijado en JS. */
+.sheet.culture-elf { --sheet-accent: #3f7fa6; }
+.sheet.culture-dwarf { --sheet-accent: #9a3b2f; }
+.sheet.culture-hobbit { --sheet-accent: #9c6b2f; }
+.sheet.culture-men { --sheet-accent: #b08a2e; }
+
+/* Boton para mostrar/ocultar las hojas */
+.sheets-toggle {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  padding: 6px 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.sheets-layer.hidden { display: none !important; }

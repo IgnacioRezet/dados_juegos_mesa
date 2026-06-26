@@ -174,12 +174,24 @@ button:active { transform: scale(0.96); }
 /* -------------------------------------------------------------------- App */
 .app { position: fixed; inset: 0; }
 
+/* Fondo: mapa de La Comarca. Si falta la imagen, queda el degradado pergamino. */
+.map-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(rgba(8, 12, 6, 0.55), rgba(8, 12, 6, 0.55)),
+    url("../assets/map-comarca.jpg") center / cover no-repeat,
+    radial-gradient(circle at 50% 40%, #2c3a22, #0a0d07);
+}
+
 #scene {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
+  z-index: 1;
 }
 
 .topbar {
@@ -238,7 +250,18 @@ button:active { transform: scale(0.96); }
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--gold);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+.panel h2::after { content: '▾'; font-size: 0.7rem; opacity: 0.7; }
+.panel.collapsed h2 { margin: 0; }
+.panel.collapsed h2::after { content: '▸'; }
+.panel.collapsed { width: auto; }
+.panel.collapsed > :not(h2) { display: none; }
 
 .participants-panel { top: 64px; left: 16px; width: 180px; }
 .log-panel { top: 64px; right: 16px; width: 260px; max-height: 55vh; overflow-y: auto; }

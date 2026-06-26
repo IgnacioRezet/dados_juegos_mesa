@@ -1,0 +1,24 @@
+# Blueprint de Render para desplegar la mesa (servidor Node + WebSockets + front).
+# Sirve los estaticos de /public y el WebSocket en el MISMO host/puerto, asi que
+# el cliente se conecta solo (network.js usa location.host + wss en https).
+#
+# Uso: en Render -> New + -> Blueprint -> conecta este repo. Render lee este
+# archivo y crea el servicio. Luego define las variables STRAPI_URL/STRAPI_TOKEN
+# en el panel (estan marcadas sync:false para NO commitearlas).
+services:
+  - type: web
+    name: dados-anillo-unico
+    runtime: node
+    plan: free
+    region: oregon            # cambia a 'frankfurt' si prefieres Europa
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true          # redeploy automatico en cada push a la rama
+    envVars:
+      # Persistencia de hojas en Strapi Cloud. Se definen en el panel de Render
+      # (Settings -> Environment). Sin ellas, la app corre en modo solo memoria.
+      - key: STRAPI_URL
+        sync: false
+      - key: STRAPI_TOKEN
+        sync: false

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dados de El Anillo Único</title>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sheet.css" />
   <script type="importmap">
     {
       "imports": {
@@ -24,6 +25,12 @@
 
       <label>Juego</label>
       <div id="game-select" class="game-cards"></div>
+
+      <!-- Cultura heroica (solo El Anillo Único) -->
+      <div id="culture-block">
+        <label>Cultura heroica</label>
+        <div id="culture-select" class="game-cards"></div>
+      </div>
 
       <label>Tu nombre
         <input id="name-input" type="text" maxlength="24" placeholder="Aragorn" />
@@ -47,7 +54,17 @@
 
   <!-- App principal -->
   <div id="app" class="app hidden">
+    <!-- Fondo: mapa de La Comarca (solo El Anillo Único) -->
+    <div id="map-bg" class="map-bg"></div>
+
     <canvas id="scene"></canvas>
+
+    <!-- Hojas de personaje de la sesión (solo El Anillo Único) -->
+    <button id="sheets-toggle" class="sheets-toggle hidden">📜 Hojas</button>
+    <div id="sheets-layer" class="sheets-layer hidden">
+      <div id="sheets-mine" class="sheets-mine"></div>
+      <div id="sheets-others" class="sheets-others"></div>
+    </div>
 
     <!-- Cabecera -->
     <header class="topbar">

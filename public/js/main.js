@@ -10,6 +10,8 @@
 import { DiceScene } from './scene.js';
 import { Network } from './network.js';
 import { listGames, getGame, DEFAULT_GAME } from './games.js';
+import { SheetView } from './sheet.js';
+import { CULTURES, DEFAULT_CULTURE } from './sheet-schema.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -20,10 +22,24 @@ const state = {
   name: localStorage.getItem('tor.name') || '',
   color: localStorage.getItem('tor.color') || '#7cc23a',
   game: localStorage.getItem('tor.game') || DEFAULT_GAME,
+  culture: localStorage.getItem('tor.culture') || DEFAULT_CULTURE,
   session: '',
   counts: {},        // cantidad elegida por tipo de dado del juego activo
   joined: false,
 };
+
+// Identidad estable del cliente (para recuperar la misma hoja tras recargar)
+let clientId = localStorage.getItem('tor.clientId');
+if (!clientId) {
+  clientId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now());
+  localStorage.setItem('tor.clientId', clientId);
+}
+
+// Hojas de personaje vivas en la sesion: playerId -> SheetView
+const sheetViews = new Map();
+// Color de cada participante por id (para indicadores de presencia)
+const participantColors = new Map();
+const colorFor = (id) => participantColors.get(id) || '#7cc23a';
 
 let currentGame = getGame(state.game);   // juego activo (autoritativo tras 'joined')
 
@@ -61,11 +77,36 @@ function renderGameCards() {
       state.game = game.id;
       localStorage.setItem('tor.game', game.id);
       renderGameCards();
+      updateCultureVisibility();
     });
     wrap.appendChild(card);
   });
 }
 renderGameCards();
+
+// Selector de cultura heroica (solo El Anillo Único)
+function renderCultureCards() {
+  const wrap = $('#culture-select');
+  wrap.innerHTML = '';
+  Object.values(CULTURES).forEach((c) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'game-card' + (c.id === state.culture ? ' selected' : '');
+    card.dataset.culture = c.id;
+    card.innerHTML = `<span class="game-name">${c.name}</span>`;
+    card.addEventListener('click', () => {
+      state.culture = c.id;
+      localStorage.setItem('tor.culture', c.id);
+      renderCultureCards();
+    });
+    wrap.appendChild(card);
+  });
+}
+function updateCultureVisibility() {
+  $('#culture-block').classList.toggle('hidden', state.game !== 'tor');
+}
+renderCultureCards();
+updateCultureVisibility();
 
 $('#random-session').addEventListener('click', () => {
   const code = Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -86,7 +127,7 @@ function joinSession() {
   localStorage.setItem('tor.name', name);
   localStorage.setItem('tor.color', state.color);
 
-  net.join(session, name, state.color, state.game);
+  net.join(session, name, state.color, state.game, state.culture, clientId);
   lobby.classList.add('hidden');
   $('#app').classList.remove('hidden');
   $('#session-code').textContent = session;
@@ -190,6 +231,13 @@ net.on('joined', (msg) => {
   applyGame(sessionGame);
 
   renderParticipants(msg.participants);
+
+  // Hojas de personaje (solo El Anillo Único)
+  if (sessionGame.id === 'tor') {
+    initSheets(msg.sheets || [], msg.editing || {});
+  } else {
+    teardownSheets();
+  }
   // Registrar tiradas pasadas (las que ya tienen resultado calculado)
   if (msg.history && msg.history.length) {
     for (const h of msg.history) {
@@ -226,12 +274,115 @@ scene.onSettled = (results) => {
 };
 
 // ---------------------------------------------------------------------------
+// Hojas de personaje colaborativas (El Anillo Único)
+// ---------------------------------------------------------------------------
+const sheetsLayer = $('#sheets-layer');
+const sheetsMine = $('#sheets-mine');
+const sheetsOthers = $('#sheets-others');
+const sheetsToggle = $('#sheets-toggle');
+
+function initSheets(sheets, editing) {
+  teardownSheets();
+  sheets.forEach((sheet) => addSheet(sheet));
+  // Aplicar la presencia inicial (quién edita qué campo)
+  for (const [field, playerId] of Object.entries(editing)) {
+    applyPresence(field, playerId);
+  }
+  sheetsToggle.classList.remove('hidden');
+  sheetsLayer.classList.remove('hidden');
+}
+
+function teardownSheets() {
+  sheetViews.clear();
+  sheetsMine.innerHTML = '';
+  sheetsOthers.innerHTML = '';
+  sheetsToggle.classList.add('hidden');
+  sheetsLayer.classList.add('hidden');
+}
+
+function addSheet(sheet) {
+  if (sheetViews.has(sheet.playerId)) return;
+  const isOwner = sheet.playerId === net.playerId;
+  const view = new SheetView({
+    sheet,
+    isOwner,
+    colorFor,
+    onEdit: (field, value) => net.sheetEdit(field, value),
+    onFocus: (field) => net.sheetFocus(`${sheet.playerId}:${field}`),
+    onBlur: (field) => net.sheetBlur(`${sheet.playerId}:${field}`),
+    onSave: () => net.sheetSave(),
+  });
+  sheetViews.set(sheet.playerId, view);
+  if (isOwner) {
+    sheetsMine.appendChild(view.root);
+  } else {
+    view.root.classList.add('compact');
+    sheetsOthers.appendChild(view.root);
+  }
+}
+
+// El campo de presencia viene como "<playerId>:<fieldKey>"
+function applyPresence(field, playerId) {
+  const sep = field.indexOf(':');
+  if (sep < 0) return;
+  const ownerId = field.slice(0, sep);
+  const key = field.slice(sep + 1);
+  const view = sheetViews.get(ownerId);
+  if (view) view.setPresence(key, playerId);
+}
+
+sheetsToggle.addEventListener('click', () => {
+  sheetsLayer.classList.toggle('hidden');
+});
+
+// Paneles Compañía / Tiradas plegables (clic en su título). Al plegarlos, la
+// capa de hojas recupera ese espacio lateral.
+function wirePanelCollapse(panelSel, appClass) {
+  const panel = $(panelSel);
+  if (!panel) return;
+  const h2 = panel.querySelector('h2');
+  h2.addEventListener('click', () => {
+    const collapsed = panel.classList.toggle('collapsed');
+    $('#app').classList.toggle(appClass, collapsed);
+  });
+}
+wirePanelCollapse('.participants-panel', 'panels-left-collapsed');
+wirePanelCollapse('.log-panel', 'panels-right-collapsed');
+
+net.on('sheetCreated', (msg) => {
+  if (msg.sheet) addSheet(msg.sheet);
+});
+
+net.on('sheetUpdate', (msg) => {
+  const view = sheetViews.get(msg.playerId);
+  if (view) view.applyUpdate(msg.field, msg.value);
+});
+
+net.on('sheetPresence', (msg) => {
+  applyPresence(msg.field, msg.playerId);
+});
+
+// Confirmacion del guardado explicito (solo llega al dueño de la hoja)
+net.on('sheetSaved', (msg) => {
+  const view = sheetViews.get(net.playerId);
+  if (!view) return;
+  if (msg.ok) {
+    const t = new Date(msg.at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    view.setSaveStatus('ok', t);
+  } else {
+    view.setSaveStatus(msg.reason === 'no-persistence' ? 'no-persistence' : 'error');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Render de participantes, anuncio y registro
 // ---------------------------------------------------------------------------
 function renderParticipants(list) {
   const el = $('#participants');
   el.innerHTML = '';
+  participantColors.clear();
   list.forEach((p) => {
+    participantColors.set(p.id, p.color || '#7cc23a');
     const li = document.createElement('li');
     const dot = document.createElement('span');
     dot.className = 'pdot';

@@ -91,17 +91,22 @@ export class DiceScene {
   }
 
   _initTable() {
+    // Fieltro translucido: deja entrever el mapa del fondo (canvas con alpha).
     const table = new THREE.Mesh(
-      new THREE.CircleGeometry(7.5, 64),
-      new THREE.MeshStandardMaterial({ color: 0x1b2a17, roughness: 0.95 })
+      new THREE.CircleGeometry(6.4, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x12200d, roughness: 0.95, transparent: true, opacity: 0.62,
+      })
     );
     table.rotation.x = -Math.PI / 2;
     table.receiveShadow = true;
     this.scene.add(table);
 
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(7.2, 7.5, 64),
-      new THREE.MeshStandardMaterial({ color: 0x3a5a2a, roughness: 0.8 })
+      new THREE.RingGeometry(6.2, 6.5, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x6b4a22, roughness: 0.8, transparent: true, opacity: 0.85,
+      })
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.01;
