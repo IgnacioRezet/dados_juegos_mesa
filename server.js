@@ -30,7 +30,7 @@ const { WebSocketServer } = require('ws');
   } catch (_) { /* sin .env, modo solo memoria */ }
 })();
 
-const { persistenceEnabled, loadSheet, saveSheet } = require('./strapi');
+const { persistenceEnabled, loadSheetsBySession, saveSheet } = require('./strapi');
 
 const app = express();
 const server = http.createServer(app);
@@ -61,6 +61,7 @@ function getSession(code) {
       game: null,
       sheets: new Map(),
       editing: new Map(),
+      sheetsLoaded: false,   // ¿se cargaron ya de Strapi las hojas de la sala?
     };
     sessions.set(code, s);
   }
@@ -170,21 +171,36 @@ wss.on('connection', (ws) => {
         // El juego lo fija quien crea la sesion; los que entran despues lo heredan.
         if (!session.game) session.game = msg.game || 'tor';
 
-        // Hoja de personaje (solo El Anillo Unico). Si no esta en memoria, se
-        // intenta cargar de Strapi; si tampoco existe alli, se crea en blanco.
+        // Hojas de personaje (solo El Anillo Unico).
         let isNewSheet = false;
-        if (session.game === 'tor' && !session.sheets.has(ws.playerId)) {
-          let sheet = await loadSheet(code, ws.playerId);
-          if (!sheet) {
-            sheet = blankSheet(ws.playerId, ws.culture, ws.playerName);
+        if (session.game === 'tor') {
+          // La PRIMERA vez que la sala vive en memoria, se cargan de Strapi
+          // TODAS sus hojas guardadas, de modo que la sala "recuerda" a todos
+          // sus personajes aunque su dueno no este conectado ahora.
+          if (!session.sheetsLoaded) {
+            session.sheetsLoaded = true;
+            const saved = await loadSheetsBySession(code);
+            for (const sh of saved) {
+              if (sh && sh.playerId && !session.sheets.has(sh.playerId)) {
+                session.sheets.set(sh.playerId, {
+                  playerId: sh.playerId,
+                  culture: sh.culture || 'men',
+                  playerName: sh.playerName || 'Aventurero',
+                  data: sh.data || {},
+                });
+              }
+            }
+          }
+          // La hoja propia del jugador: si no existe (ni en memoria ni guardada),
+          // se crea en blanco. No se persiste al entrar: solo con "Guardar".
+          if (!session.sheets.has(ws.playerId)) {
+            session.sheets.set(ws.playerId, blankSheet(ws.playerId, ws.culture, ws.playerName));
             isNewSheet = true;
           } else {
-            // Actualiza metadatos de presentacion con los del lobby actual.
-            sheet.culture = sheet.culture || ws.culture;
-            sheet.playerName = ws.playerName;
+            const own = session.sheets.get(ws.playerId);
+            own.playerName = ws.playerName;          // refresca su nombre visible
+            if (!own.culture) own.culture = ws.culture;
           }
-          session.sheets.set(ws.playerId, sheet);
-          // No se persiste al entrar: la hoja solo se guarda con "Guardar".
         }
 
         // Confirmar al jugador que entro, con su id, el juego y el historial

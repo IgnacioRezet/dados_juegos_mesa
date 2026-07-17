@@ -73,6 +73,26 @@ async function loadSheet(sessionCode, playerId) {
 }
 
 /**
+ * Carga TODAS las hojas guardadas de una sala (por sessionCode).
+ * @returns {Promise<object[]>} lista de hojas planas (vacia si sin persistencia).
+ */
+async function loadSheetsBySession(sessionCode) {
+  if (!persistenceEnabled) return [];
+  try {
+    const qs =
+      `?filters[sessionCode][$eq]=${encodeURIComponent(sessionCode)}` +
+      `&pagination[pageSize]=100`;
+    const res = await fetch(base() + qs, { headers: headers() });
+    if (!res.ok) throw new Error(`Strapi find ${res.status}`);
+    const json = await res.json();
+    return (json.data || []).map(flatten).filter(Boolean);
+  } catch (err) {
+    console.warn('[strapi] loadSheetsBySession fallo:', err.message);
+    return [];
+  }
+}
+
+/**
  * Crea o actualiza la hoja de (sessionCode, playerId).
  * @returns {Promise<object|null>} hoja plana guardada o null si sin persistencia / error.
  */
@@ -114,4 +134,4 @@ async function saveSheet(sessionCode, playerId, sheet) {
   }
 }
 
-module.exports = { persistenceEnabled, loadSheet, saveSheet };
+module.exports = { persistenceEnabled, loadSheet, loadSheetsBySession, saveSheet };
