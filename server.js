@@ -30,7 +30,7 @@ const { WebSocketServer } = require('ws');
   } catch (_) { /* sin .env, modo solo memoria */ }
 })();
 
-const { persistenceEnabled, loadSheetsBySession, saveSheet } = require('./strapi');
+const { persistenceEnabled, loadSheet, saveSheet } = require('./strapi');
 
 const app = express();
 const server = http.createServer(app);
@@ -61,7 +61,6 @@ function getSession(code) {
       game: null,
       sheets: new Map(),
       editing: new Map(),
-      sheetsLoaded: false,   // ¿se cargaron ya de Strapi las hojas de la sala?
     };
     sessions.set(code, s);
   }
@@ -76,6 +75,24 @@ function getSession(code) {
 // ---------------------------------------------------------------------------
 function blankSheet(playerId, culture, playerName) {
   return { playerId, culture: culture || 'men', playerName: playerName || 'Aventurero', data: {} };
+}
+
+/**
+ * Identidad estable de un jugador DENTRO de una sala, derivada de su nombre.
+ * El mismo nombre reclama siempre la misma hoja (entres desde el navegador que
+ * entres), lo que evita hojas duplicadas. Nombres distintos = personajes
+ * distintos; el mismo nombre = el mismo personaje.
+ */
+function playerIdFromName(name) {
+  const norm = String(name || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')   // quita acentos
+    .replace(/[^a-z0-9]+/g, '-')       // no alfanumerico -> guion
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return 'n-' + (norm || 'anon');
 }
 
 function sheetsList(session) {
@@ -98,12 +115,20 @@ function broadcast(sessionCode, payload, exclude = null) {
 }
 
 function participantsList(session) {
-  return [...session.clients].map((c) => ({
-    id: c.playerId,
-    name: c.playerName,
-    color: c.color,
-    culture: c.culture || 'men',
-  }));
+  // Deduplica por playerId: varias conexiones con el mismo nombre (mismo
+  // personaje en varias pestanas/dispositivos) cuentan como un unico jugador.
+  const seen = new Map();
+  for (const c of session.clients) {
+    if (!seen.has(c.playerId)) {
+      seen.set(c.playerId, {
+        id: c.playerId,
+        name: c.playerName,
+        color: c.color,
+        culture: c.culture || 'men',
+      });
+    }
+  }
+  return [...seen.values()];
 }
 
 // ---------------------------------------------------------------------------
@@ -154,13 +179,10 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
       case 'join': {
         const code = (msg.session || 'mesa-central').trim().toUpperCase();
-        // Identidad estable del cliente (persistida en su localStorage): permite
-        // recuperar la misma hoja tras recargar o reconectar. Sin ella, cada
-        // conexion seria un jugador nuevo con una hoja en blanco.
-        if (typeof msg.clientId === 'string' && msg.clientId) {
-          ws.playerId = 'c-' + msg.clientId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
-        }
         ws.playerName = (msg.name || 'Aventurero').slice(0, 24);
+        // Identidad por NOMBRE dentro de la sala: el mismo nombre reclama la
+        // misma hoja (entres desde el navegador que entres), evitando duplicados.
+        ws.playerId = playerIdFromName(ws.playerName);
         ws.color = msg.color || ws.color;
         ws.culture = msg.culture || ws.culture || 'men';
         ws.sessionCode = code;
@@ -171,36 +193,21 @@ wss.on('connection', (ws) => {
         // El juego lo fija quien crea la sesion; los que entran despues lo heredan.
         if (!session.game) session.game = msg.game || 'tor';
 
-        // Hojas de personaje (solo El Anillo Unico).
+        // Hoja de personaje propia (solo El Anillo Unico). Solo se muestran las
+        // hojas de quienes estan conectados: se carga UNICAMENTE la del jugador
+        // que entra (por su identidad de nombre); si no existe en Strapi, se crea
+        // en blanco. No se persiste al entrar: solo con "Guardar personaje".
         let isNewSheet = false;
-        if (session.game === 'tor') {
-          // La PRIMERA vez que la sala vive en memoria, se cargan de Strapi
-          // TODAS sus hojas guardadas, de modo que la sala "recuerda" a todos
-          // sus personajes aunque su dueno no este conectado ahora.
-          if (!session.sheetsLoaded) {
-            session.sheetsLoaded = true;
-            const saved = await loadSheetsBySession(code);
-            for (const sh of saved) {
-              if (sh && sh.playerId && !session.sheets.has(sh.playerId)) {
-                session.sheets.set(sh.playerId, {
-                  playerId: sh.playerId,
-                  culture: sh.culture || 'men',
-                  playerName: sh.playerName || 'Aventurero',
-                  data: sh.data || {},
-                });
-              }
-            }
-          }
-          // La hoja propia del jugador: si no existe (ni en memoria ni guardada),
-          // se crea en blanco. No se persiste al entrar: solo con "Guardar".
-          if (!session.sheets.has(ws.playerId)) {
-            session.sheets.set(ws.playerId, blankSheet(ws.playerId, ws.culture, ws.playerName));
+        if (session.game === 'tor' && !session.sheets.has(ws.playerId)) {
+          let sheet = await loadSheet(code, ws.playerId);
+          if (!sheet) {
+            sheet = blankSheet(ws.playerId, ws.culture, ws.playerName);
             isNewSheet = true;
           } else {
-            const own = session.sheets.get(ws.playerId);
-            own.playerName = ws.playerName;          // refresca su nombre visible
-            if (!own.culture) own.culture = ws.culture;
+            sheet.culture = sheet.culture || ws.culture;
+            sheet.playerName = ws.playerName;
           }
+          session.sheets.set(ws.playerId, sheet);
         }
 
         // Confirmar al jugador que entro, con su id, el juego y el historial
@@ -361,6 +368,14 @@ wss.on('connection', (ws) => {
         session.editing.delete(field);
         broadcast(code, { type: 'sheetPresence', field, playerId: null });
       }
+    }
+
+    // Si no queda ninguna otra conexion de este jugador (mismo nombre), su hoja
+    // deja de mostrarse a los demas (queda guardada en Strapi para su regreso).
+    const stillConnected = [...session.clients].some((c) => c.playerId === ws.playerId);
+    if (!stillConnected && session.sheets.has(ws.playerId)) {
+      session.sheets.delete(ws.playerId);
+      broadcast(code, { type: 'sheetRemoved', playerId: ws.playerId });
     }
 
     if (session.clients.size === 0) {

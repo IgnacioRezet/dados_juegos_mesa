@@ -377,6 +377,15 @@ net.on('sheetUpdate', (msg) => {
   if (view) view.applyUpdate(msg.field, msg.value);
 });
 
+// Un jugador se desconectó: su hoja deja de mostrarse (sigue guardada en Strapi).
+net.on('sheetRemoved', (msg) => {
+  const view = sheetViews.get(msg.playerId);
+  if (view) {
+    view.root.remove();
+    sheetViews.delete(msg.playerId);
+  }
+});
+
 net.on('sheetPresence', (msg) => {
   applyPresence(msg.field, msg.playerId);
 });
