@@ -30,7 +30,7 @@ const { WebSocketServer } = require('ws');
   } catch (_) { /* sin .env, modo solo memoria */ }
 })();
 
-const { persistenceEnabled, loadSheet, saveSheet } = require('./strapi');
+const { persistenceEnabled, loadSheet, loadSheetByName, saveSheet } = require('./strapi');
 
 const app = express();
 const server = http.createServer(app);
@@ -199,11 +199,15 @@ wss.on('connection', (ws) => {
         // en blanco. No se persiste al entrar: solo con "Guardar personaje".
         let isNewSheet = false;
         if (session.game === 'tor' && !session.sheets.has(ws.playerId)) {
+          // 1) por identidad de nombre; 2) compat: por nombre (hojas antiguas
+          //    guardadas con otra identidad); 3) si nada, hoja en blanco.
           let sheet = await loadSheet(code, ws.playerId);
+          if (!sheet) sheet = await loadSheetByName(code, ws.playerName);
           if (!sheet) {
             sheet = blankSheet(ws.playerId, ws.culture, ws.playerName);
             isNewSheet = true;
           } else {
+            sheet.playerId = ws.playerId;          // adopta la identidad por nombre
             sheet.culture = sheet.culture || ws.culture;
             sheet.playerName = ws.playerName;
           }

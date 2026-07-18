@@ -73,6 +73,30 @@ async function loadSheet(sessionCode, playerId) {
 }
 
 /**
+ * Busca la hoja mas reciente de una sala cuyo playerName coincida (sin importar
+ * mayus/minus). Sirve de compatibilidad: recupera personajes guardados con una
+ * identidad antigua (p. ej. `c-<clientId>`) para reasociarlos por nombre.
+ * @returns {Promise<object|null>}
+ */
+async function loadSheetByName(sessionCode, playerName) {
+  if (!persistenceEnabled || !playerName) return null;
+  try {
+    const qs =
+      `?filters[sessionCode][$eq]=${encodeURIComponent(sessionCode)}` +
+      `&filters[playerName][$eqi]=${encodeURIComponent(playerName)}` +
+      `&sort=updatedAt:desc&pagination[pageSize]=1`;
+    const res = await fetch(base() + qs, { headers: headers() });
+    if (!res.ok) throw new Error(`Strapi find ${res.status}`);
+    const json = await res.json();
+    const list = json.data || [];
+    return list.length ? flatten(list[0]) : null;
+  } catch (err) {
+    console.warn('[strapi] loadSheetByName fallo:', err.message);
+    return null;
+  }
+}
+
+/**
  * Carga TODAS las hojas guardadas de una sala (por sessionCode).
  * @returns {Promise<object[]>} lista de hojas planas (vacia si sin persistencia).
  */
@@ -134,4 +158,4 @@ async function saveSheet(sessionCode, playerId, sheet) {
   }
 }
 
-module.exports = { persistenceEnabled, loadSheet, loadSheetsBySession, saveSheet };
+module.exports = { persistenceEnabled, loadSheet, loadSheetByName, loadSheetsBySession, saveSheet };
